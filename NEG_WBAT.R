@@ -16,7 +16,7 @@ library(lubridate)
 
 setwd("C:\\Users\\jchawars\\OneDrive - Memorial University of Newfoundland\\NEG")
 
-NEG_CTD <- read.ctd.sbe("CTD\\Dat\\26da.2017.9.8.cnv")  #read a single CTD files that coincides with WBAT profile
+NEG_CTD <- read.ctd.sbe("CTD\\UpDown\\26da.2017.9.8_110618.cnv")  #read a single CTD files that coincides with WBAT profile
 NEG_CTD.data <- data.frame(NEG_CTD[["data"]])  #select just the data portion
 
 # # # NEG CTD data only records timeS (time in seconds) in the time slot, therfore we use startime as a reference
@@ -29,6 +29,7 @@ NEG_CTD.data$Time <- NEG_CTD.data$timeS + time_seconds # convert timeS to second
 # Read in the WBAT data
 
 Stn3_wbat <- read.csv("WBAT\\Export\\Stn3_wbat_200kHz_sv.csv")
+Stn3_wbat <- read.csv("WBAT\\Export\\Stn3_wbat_70kHz_sv.csv")
 
 Stn3_wbat$Date_M <- as.Date(as.character(Stn3_wbat$Date_M), "%Y%m%d")  # convert Date_M to class "Date"
 Stn3_wbat$datetime <- as.POSIXct(paste(Stn3_wbat$Date_M, Stn3_wbat$Time_M), format="%Y-%m-%d %H:%M:%S", tz="UTC")
@@ -46,6 +47,40 @@ wbat.ctd <- Stn3_wbat %>% left_join(., NEG_CTD.data, by="Time")
 
 # --- In Progress --- 
 # calculate absorption coefficient to adjust Sv and TS values based on sound speed
+
+# Following Doonan et al 2003 (ICES) -- ignored boric acid component of equation
+
+Temp <- 0.35
+Sal <- 34.54
+Depth <- 50
+
+# Following Doonan et al 2003 (ICES) -- ignored boric acid component of equation
+c  <- 1412 + 3.21*Temp +1.19*Sal + 0.0167*Depth   # soundSpeed
+f  <- 38                                          # Acoustic Frequency (kHz)
+A2 <- 22.19*Sal*(1+0.0017*Temp)
+f2 <- 1.8e7*exp(-1818/(Temp+273.1))
+P2 <- exp(-1.76e4*Depth)
+A3 <- 4.937e-4 - 2.59e-5*Temp + 9.11e-7*Temp^2 - 1.5e-8*Temp^3
+P3 <- 1-3.83e-5*Depth + 4.9e-10*Depth^2
+
+alpha <- A2*P2*f2*f^2/(f2^2+f)/c + A3*P3*f^2
+
+# Following Francois & Garrison 1982
+
+c <_ 1448.96
+pH <- 8
+
+A1 <- 8.86*10^(0.78*pH-5)
+A2 <- (21.44*Sal*(1+ (0.025*Temp)))/c
+A3 <- 4.937e-4 - 2.59e-5*Temp + 9.11e-7*Temp^2 - (1.5e-8*Temp^3)
+f1 <- 2.8*sqrt(Sal/35)*10^(4-(1245/(Temp+273)))
+f2 <- (8.17*10^(8-(1990/Temp+273)))/1+(0.0018*(Sal-35))
+P2 <- 1-1.37e-4*Depth + 6.2e-9*Depth^2
+P3 <- 1-3.83e-5*Depth + 4.9e-10*Depth^2
+
+alpha <- f^2 * ((A1*f1/f1^2+f^2) + (A2*P2*f2/f2^2+f^2) + (A3*P3))
+
+
 # --- In Progress --- 
 
 
