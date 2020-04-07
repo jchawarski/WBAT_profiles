@@ -35,7 +35,6 @@ Stn3_wbat$Date_M <- as.Date(as.character(Stn3_wbat$Date_M), "%Y%m%d")  # convert
 Stn3_wbat$datetime <- as.POSIXct(paste(Stn3_wbat$Date_M, Stn3_wbat$Time_M), format="%Y-%m-%d %H:%M:%S", tz="UTC")
 
 Stn3_wbat$Time <- period_to_seconds(lubridate::seconds(Stn3_wbat$datetime))
-
 Stn3_wbat$Time <- Stn3_wbat$Time - 116    # <--- Include the correction factor for time difference between CTD and WBAT 
 # For example - Stn3 (GearNo 8) has WBAT ahead of CTD by 1:54 == 116 seconds
 
@@ -67,27 +66,46 @@ alpha <- A2*P2*f2*f^2/(f2^2+f)/c + A3*P3*f^2
 
 # Following Francois & Garrison 1982
 
-c <_ 1448.96
+c <- 1448.96 + 4.591*Temp - 0.05304*Temp^2 + 2.374e-4*T^3 + 1.34*(Sal-35) + 0.0163*Depth + 1.675*10^-7*Depth^2 - 0.01025*Temp*(Sal-35)- 7.139*10^-13*Temp*Depth^3
 pH <- 8
 
-A1 <- 8.86*10^(0.78*pH-5)
-A2 <- (21.44*Sal*(1+ (0.025*Temp)))/c
+A1 <- (8.86/c)*10^((0.78*pH)-5)
+A2 <- (21.44*Sal*(1+ 0.025*Temp))/c
 A3 <- 4.937e-4 - 2.59e-5*Temp + 9.11e-7*Temp^2 - (1.5e-8*Temp^3)
-f1 <- 2.8*sqrt(Sal/35)*10^(4-(1245/(Temp+273)))
+f1 <- 2.8*(Sal/35)^0.5*10^(4-(1245/(Temp+273)))
 f2 <- (8.17*10^(8-(1990/Temp+273)))/1+(0.0018*(Sal-35))
-P2 <- 1-1.37e-4*Depth + 6.2e-9*Depth^2
-P3 <- 1-3.83e-5*Depth + 4.9e-10*Depth^2
+P2 <- 1-(1.37e-4*Depth) + (6.2e-9*Depth^2)
+P3 <- 1-(3.83e-5*Depth) + (4.9e-10*Depth^2)
 
-alpha <- f^2 * ((A1*f1/f1^2+f^2) + (A2*P2*f2/f2^2+f^2) + (A3*P3))
+alpha <-  ((A1*f1*f^2)/(f1^2+f^2)) + ((A2*P2*f2*f^2)/(f2^2+f^2)) + (A3*P3*f^2)
 
+
+# Correction factor for Sv equation to apply absorption coefficient
+
+# echoview default absorption coefficient
+# swSoundsAbsorption(f[Hz], Salinity, Temperature, Pressure, pH, formualtion= "francois-garrison")
+
+abs.default <-  swSoundAbsorption(200000, 35, 8, 0, 8, formulation= "francois-garrison")
+
+wbat.ctd$Corr_factor <- -(wbat.ctd$Sv_mean)*abs.default
+wbat.ctd$abs_coeff <- swSoundAbsorption(frequency= 200000,
+                                        salinity = wbat.ctd$salinity,
+                                        temperature = wbat.ctd$temperature,
+                                        pressure = wbat.ctd$depth,
+                                        pH =8,
+                                        formulation = "francois-garrison")
+
+wbat.ctd$Sv_corr <- -wbat.ctd$Corr_factor/wbat.ctd$abs_coeff
 
 # --- In Progress --- 
 
 
+# Number of fish tracks in profile. 
+
 # create profile by custom binwidth
 
 d <- wbat.ctd$depth
-N <- wbat.ctd$Sv_mean # calibrated Sv_values
+N <- wbat.ctd$Sv_corr # calibrated Sv_values
 db <- seq(0, max(d, na.rm=T), 0.5) #creates a depth range vector at x resolution (start range, end range, bin size[x])
 wbat.binned <- binMean1D(d, N, db) # supplies the mean value for each depth bin
 wbat.binned<- data.frame(c(wbat.binned["xmids"],wbat.binned["result"]))
@@ -97,7 +115,7 @@ d_scale <- seq(0, max(wbat.ctd$depth, na.rm=T), 200)
 ggplot(wbat.binned, aes(x=xmids, y=result)) + geom_line(size=1) +
   coord_flip() + scale_x_reverse(breaks=d_scale) +
   labs(x="Depth (m)", y="Sv mean") +       # 
-  scale_y_continuous(breaks=c(-85,-80,-75,-70,-65,-60)) +                   #standardized scale for turbidty
+ # scale_y_continuous(breaks=c(-85,-80,-75,-70,-65,-60)) +                   #standardized scale for turbidty
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(), 
         plot.title = element_text(hjust=0.5), 
