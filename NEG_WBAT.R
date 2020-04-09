@@ -48,11 +48,12 @@ wbat.ctd <- wbat %>% left_join(., CTD.data, by="Time") # join ctd and wbat data.
 # echoview default absorption coefficient - below values are derived from ecs file
 # swSoundsAbsorption(f[Hz], Salinity, Temperature, Pressure, pH, formualtion= "francois-garrison")
 
-abs.default <-  swSoundAbsorption(200000, 35, 8, 0, 8, formulation= "francois-garrison")
+abs.default <-  swSoundAbsorption(200000, 35, 8, 0, 8, formulation= "francois-garrison") #200 kHz
+abs.default <-  swSoundAbsorption(70000, 35, 8, 0, 8, formulation= "francois-garrison") # 70 kHz
 
 wbat.ctd$Corr_factor <- abs.default - wbat.ctd$Sv_mean 
 
-wbat.ctd$abs_coeff <- swSoundAbsorption(frequency= 200000,
+wbat.ctd$abs_coeff <- swSoundAbsorption(frequency= 70000, # adjust based on f
                                         salinity = wbat.ctd$salinity,
                                         temperature = wbat.ctd$temperature,
                                         pressure = wbat.ctd$depth,
@@ -74,7 +75,9 @@ d_scale <- seq(0, max(wbat.ctd$depth, na.rm=T), 200)
 ggplot(wbat.binned, aes(x=xmids, y=result)) + geom_line(size=1) +
   coord_flip() + scale_x_reverse(breaks=d_scale) +
   labs(x="Depth [m])", y="Sv mean [db re 1m] ") +       # 
-  scale_y_continuous(breaks=c(-90, -85,-80,-75,-70,-65,-60)) +             
+#  scale_y_continuous(breaks=c(-90, -85,-80,-75,-70,-65,-60)) +    #200 kHz
+  scale_y_continuous(breaks=c(-100,-95,-90,-85,-80)) +    # 70 kHz
+  
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank(), 
         plot.title = element_text(hjust=0.5), 
