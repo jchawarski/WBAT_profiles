@@ -18,6 +18,8 @@ library(reshape2)
 library(lubridate)
 library(imputeTS)
 
+### Sv - MEAN VOLUME BACKSCATTER - ###
+
 setwd("C:\\Users\\jchawars\\OneDrive - Memorial University of Newfoundland\\NEG")
 
 CTD <- read.ctd.sbe("CTD\\UpDown\\26da.2017.9.8_110618.cnv")  #read a single CTD files that coincides with WBAT profile
@@ -26,14 +28,14 @@ CTD.data <- data.frame(CTD[["data"]])  #select just the data portion
 time <- CTD[["metadata"]]$startTime   # collect the start time of the cast
 time_seconds <- period_to_seconds(lubridate::seconds(time))  # convert start time to seconds (timeY)
 
-CTD.data$Interval <- CTD.data$timeS + time_seconds # convert timeS to seconds by adding to start time
-
+CTD.data$Interval <- CTD.data$timeS + time_seconds + 5  # convert timeS to seconds by adding to start time
+                             # number of seconds from adjustments in CTD_WBAT-Time-at-depth.csv
 # Read in the WBAT data
-wbat <- read.csv2("WBAT\\Export\\St.3_200kHz_Sv.txt", sep = ",", skip=6,header=FALSE, fill = TRUE)
+wbat <- read.csv2("WBAT\\200kHz Sv\\St.3_200kHz_Sv_T20170824_22431600-20170825_01490819.txt", sep = ",", skip=6,header=FALSE, fill = TRUE)
 #wbat <- read.csv2("St.3_70kHz_Sv.txt", sep = ",", skip=6,header=FALSE, fill = TRUE)
 
 # Give new names to columns:
-nms <- c("PingNumber","Frequency","Date","Time","Latitude","Longitude","RangeStart","RangeStop","DepthStart","DepthStop","SampleCount", sprintf("Sv%02d", seq(1,3696)))
+nms <- c("PingNumber","Frequency","Date","Time","Latitude","Longitude","RangeStart","RangeStop","DepthStart","DepthStop","SampleCount", sprintf("Sv%02d", seq(1,(dim(wbat)[2])-11)))
 
 # Assign columns to data.frame
 colnames(wbat) <- nms
@@ -45,11 +47,12 @@ wbat.meta <- wbat[1:dim(wbat)[1],1:11]      # select the metadata portion
 
 # convert the probe time to the same format as the CTD -- NOTE: ECHOVIEW 11 has fixed their export headers...
 
-wbat.meta$Time <- gsub("(..)(..)(..)(..)", "\\1:\\2:\\3:\\4", wbat.meta$Time)
+
+wbat.meta$Time <- gsub("(..)(..)(..)(..)", "\\1:\\2:\\3:\\4", wbat.meta$Time) # adjust the first (..) to (.) for single digit hours... smh
 wbat.meta$Date<- as.Date(as.character(wbat.meta$Date), "%Y%m%d")
 wbat.meta$datetime <- as.POSIXct(paste(wbat.meta$Date, wbat.meta$Time), format="%Y-%m-%d %H:%M:%S", tz="UTC")
 
-wbat.meta$Interval <- period_to_seconds(lubridate::seconds(wbat.meta$datetime))
+wbat.meta$Interval <- period_to_seconds(lubridate::seconds(wbat.meta$datetime)) + 2  # add or subtract seconds to adjust the time difference between instruments
 
 wbat.ctd <- wbat.meta %>% 
   left_join(., CTD.data, by="Interval") %>%     # join ctd and wbat data.frames by matching time cases
@@ -130,13 +133,13 @@ wbat.ctd$wbat_site <- "Stn.3"
 wbat.ctd$ctd_site <- "26da.2017.9.8_110618"
 
 
-write.csv(wbat.ctd, "NEG2017_200khz_wbat_ctd.csv")
+write.csv(wbat.ctd, "NEG2017_Stn.3_Gr.8_200kHz_WBAT-CTD.csv")
 wbat.ctd <- read.csv("NEG2017_200khz_wbat_ctd.csv")
 
 ## Plotting the corrected mean Sv value as a profile ##
 
 Sv_label <- expression(paste("Mean S"["v"]," [dB re 1 m" ^-1,"]"))
-d_scale <- seq(0, max(wbat.ctd$pressure), 200) # set depth scale for plotting
+d_scale <- seq(0, max(wbat.ctd$pressure), 100) # set depth scale for plotting
 
 # comparison plot -- this plot shows both the original and the adjusted mean Sv value for the profile
 sv.plot <-  ggplot(wbat.ctd, aes(x=pressure, y=Estimate_new)) + 
@@ -168,7 +171,7 @@ echoplot <- ggplot(echo.small, aes(x*5, y/4)) +
   geom_raster(aes(fill=value)) +
   scale_fill_gradientn(colours=ocean.haline(100), guide = "colourbar", name="MVBS")  + 
   coord_flip() + scale_x_reverse(breaks=d_scale) + 
-  xlim(980,0) + ylim(5,190) +
+  xlim(max(wbat.ctd$pressure),0) + ylim(5,190) +
   labs(x="Pressure [dBar]", y= "Range [m]") +
   theme(legend.position="left") +
   theme_bw()
@@ -201,10 +204,109 @@ Ham.plot <- ggplot(wbat.ctd, aes(x=pressure, y=Ham)) + geom_line(colour="purple"
 
 
 require(cowplot)
-plot_grid(echoplot, sv.plot, T.plot, S.plot, O.plot,  nrow=1, ncol=5,rel_widths = c(2, 1, 1, 1, 1))
+comp.plot <- plot_grid(echoplot, sv.plot, T.plot, S.plot, O.plot,  nrow=1, ncol=5,rel_widths = c(2, 1, 1, 1, 1))
 
 
+title <- ggdraw() + 
+  draw_label(
+    "NEG 2017 Stn 3 Gear 8 - 200 kHz WBAT/CTD",
+    fontface = 'bold',
+    x = 0,
+    hjust = -1
+  ) +
+  theme(
+    # add margin on the left of the drawing canvas,
+    # so title is aligned with left edge of first plot
+    plot.margin = margin(0, 0, 0, 7)
+  )
+plot_grid(
+  title, comp.plot,
+  ncol = 1,
+  # rel_heights values control vertical title margins
+  rel_heights = c(0.1, 1)
+)
 
+
+# .csv filename NEG2017_Stn.3_Gr.8_200kHz_WBAT-CTD
+# .png filename NEG_St.3_Gr.8_200kHz_wbatctd
+
+
+## TS - Target depth alignment and Target Strength Analysis ##
+
+setwd("C:\\Users\\jchawars\\OneDrive - Memorial University of Newfoundland\\NEG")
+
+CTD <- read.ctd.sbe("CTD\\UpDown\\26da.2017.9.8_110618.cnv")  #read a single CTD files that coincides with WBAT profile
+CTD.data <- data.frame(CTD[["data"]])  #select just the data portion
+
+time <- CTD[["metadata"]]$startTime   # collect the start time of the cast
+time_seconds <- period_to_seconds(lubridate::seconds(time))  # convert start time to seconds (timeY)
+
+CTD.data$Interval <- CTD.data$timeS + time_seconds + 114  # convert timeS to seconds by adding to start time and  add or subtract seconds to adjust the time difference between instruments
+# number of seconds from adjustments in CTD_WBAT-Time-at-depth.csv
+
+wbat.ts <- read.csv2("WBAT\\200kHz TS\\St.3_200kHz_TS_T20170824_22431600-20170825_01490819.txt", sep = ",", skip=19,header=FALSE, fill = TRUE)
+# Give new names to columns:
+nms <- c("Date","Time","Latitude","Longitude","Range","TSC","TSU","AlongshipAngle","AthwartshipAngle","sV_of_peak")
+
+# Assign columns to data.frame
+colnames(wbat.ts) <- nms
+head(wbat.ts)
+
+wbat.ts$Time <- gsub("(..)(..)(..)(..)", "\\1:\\2:\\3:\\4", wbat.ts$Time) # adjust the first (..) to (.) for single digit hours... smh
+wbat.ts$Date<- as.Date(as.character(wbat.ts$Date), "%Y%m%d")
+wbat.ts$datetime <- as.POSIXct(paste(wbat.ts$Date, wbat.ts$Time), format="%Y-%m-%d %H:%M:%S", tz="UTC")
+wbat.ts$Interval <- period_to_seconds(lubridate::seconds(wbat.ts$datetime))   
+
+wbat.ctd <- wbat.ts %>% 
+  left_join(., CTD.data, by="Interval") %>%     # join ctd and wbat data.frames by matching time cases
+  mutate_all(., as.numeric)          # convert all values to numeric
+
+sal <- wbat.ctd$salinity
+temp <- wbat.ctd$temperature
+p <- wbat.ctd$pressure
+
+require(oce)
+c_new <- swSoundSpeed(salinity = sal,temperature = temp, pressure = p) # new sound speed
+
+# set constant variables from orginial calibration file -- These are all dependent on transducer type and default data colllection settings
+c <-1482.41             # original sound speed
+coeff_abs <- 0.05    # original coefficient of absorption
+t <-2.14 *10^-4         # PulseCompressedEffectivePulseLength (sec)
+y <- -20.7                # two-way beam angle  --- Adjust based on transducer 
+
+f_nominal <-200000 # nominal frequency in Hz   -- Adjust based on transducer
+f <- 200000        # center frequency         NOTE: for wideband data, these are different values
+
+equi_beam_angle <-10^((y+20*log(f_nominal/f))/10)          # calculate equivalent beam angle
+coeff_abs_new <-swSoundAbsorption(frequency= f_nominal,    # new absorption coefficient
+                                  salinity = sal,
+                                  temperature = temp,
+                                  pressure = p, 
+                                  pH =8,
+                                  formulation = "francois-garrison") 
+
+wbat.ctd$signal_time <- (c*t/4+wbat.ctd$Range)*(2/c) #time for the signal to return 
+
+
+# calculate new range based on sound speed
+wbat.ctd$Range_new <- wbat.ctd$signal_time*c_new/2-c_new*t/4   #new range matrix
+
+# calculate power matrix
+wbat.ctd$power<- wbat.ctd$TSC-40*log10(wbat.ctd$Range)-2*(coeff_abs)*(wbat.ctd$Range) 
+
+## Calculate exact TS for each target using the equation TS = Power + 40logR + 2* alpha * R_new 
+wbat.ctd$TSC_new <- wbat.ctd$power+40*log10(wbat.ctd$Range_new)+2*coeff_abs_new*wbat.ctd$Range_new  
+
+ggplot(wbat.ctd, aes(x=pressure, y=TSC_new)) + 
+  geom_point(colour="blue", size=0.5) +  
+  coord_flip()+ scale_x_reverse(breaks=d_scale) + labs(x= "Pressure [dBar]", y= "Target Strength [dB]") +
+  theme_bw()
+
+write.csv(wbat.ctd, "NEG2017_Stn3._Gr.8_200kHZ_WBAT-CTD-TS.csv")
+
+wbat.ctd %>% 
+  mutate(bin_dist = factor(pressure%/%bin_size*50)) %>% 
+  ggplot(aes(x = bin_dist, y = TSC_new)) +  geom_boxplot() + coord_flip() + theme_bw()
 
 
 
