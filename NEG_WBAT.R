@@ -22,16 +22,16 @@ library(imputeTS)
 
 setwd("C:\\Users\\jchawars\\OneDrive - Memorial University of Newfoundland\\NEG")
 
-CTD <- read.ctd.sbe("CTD\\UpDown\\26da.2017.9.395_110618.cnv")  #read a single CTD files that coincides with WBAT profile
+CTD <- read.ctd.sbe("CTD\\UpDown\\26DA.2017.9.288_060620.cnv")  #read a single CTD files that coincides with WBAT profile
 CTD.data <- data.frame(CTD[["data"]])  #select just the data portion
 
 time <- CTD[["metadata"]]$startTime   # collect the start time of the cast
 time_seconds <- period_to_seconds(lubridate::seconds(time))  # convert start time to seconds (timeY)
 
-CTD.data$Interval <- CTD.data$timeS + time_seconds - 5 # convert timeS to seconds by adding to start time
+CTD.data$Interval <- CTD.data$timeS + time_seconds + 7 # convert timeS to seconds by adding to start time
                              # number of seconds from adjustments in CTD_WBAT-Time-at-depth.csv
 # Read in the WBAT data
-wbat <- read.csv2("WBAT\\All_Sv_70_200kHz\\St.80_70kHz_Sv_T20170908_21582701-20170908_22142300.txt", sep = ",", skip=6,header=FALSE, fill = TRUE)
+wbat <- read.csv2("WBAT\\All_Sv_70_200kHz\\St.61_200kHz_Sv_T20170904_14184228-20170904_14262600.txt", sep = ",", skip=6,header=FALSE, fill = TRUE)
 #wbat <- read.csv2("St.3_70kHz_Sv.txt", sep = ",", skip=6,header=FALSE, fill = TRUE)
 
 # Give new names to columns:
@@ -69,13 +69,13 @@ require(oce)
 c_new <- swSoundSpeed(salinity = sal,temperature = temp, pressure = p) # new sound speed
 
 # set constant variables from orginial calibration file -- These are all dependent on transducer type and default data colllection settings
-c <-1440.94             # original sound speed
-coeff_abs <- 0.01678    # original coefficient of absorption
-t <-1.95 *10^-4         # PulseCompressedEffectivePulseLength (sec)
-y <- -13                # two-way beam angle  --- Adjust based on transducer 
+c <-1482.41             # original sound speed
+coeff_abs <- 0.05047   # original coefficient of absorption
+t <-2.14 *10^-4         # PulseCompressedEffectivePulseLength (sec)
+y <- -20.7                # two-way beam angle  --- Adjust based on transducer 
 
-f_nominal <-70000 # nominal frequency in Hz   -- Adjust based on transducer
-f <- 70000        # center frequency         NOTE: for wideband data, these are different values
+f_nominal <-200000 # nominal frequency in Hz   -- Adjust based on transducer
+f <- 200000        # center frequency         NOTE: for wideband data, these are different values
 
 equi_beam_angle <-10^((y+20*log(f_nominal/f))/10)          # calculate equivalent beam angle
 coeff_abs_new <-swSoundAbsorption(frequency= f_nominal,    # new absorption coefficient
@@ -133,7 +133,7 @@ wbat.ctd <- cbind(wbat.ctd, Sv_old_ci, Sv_new_ci)
 ## Plotting the corrected mean Sv value as a profile ##
 
 Sv_label <- expression(paste("Mean S"["v"]," [dB re 1 m" ^-1,"]"))
-d_scale <- seq(0, max(wbat.ctd$pressure), 100) # set depth scale for plotting
+d_scale <- seq(0, max(wbat.ctd$pressure), 25) # set depth scale for plotting
 
 # comparison plot -- this plot shows both the original and the adjusted mean Sv value for the profile
  ggplot(wbat.ctd, aes(x=pressure, y=Estimate_new)) + 
@@ -144,9 +144,9 @@ d_scale <- seq(0, max(wbat.ctd$pressure), 100) # set depth scale for plotting
   # xlim(510, 490) + ylim(-90,-85) +
   theme_bw()
 
-       wbat.ctd$wbat_site <- "Stn.84"
-       wbat.ctd$ctd_site <- "26da.2017.9.395_110618"
-       write.csv(wbat.ctd, "NEG2017_Stn.80_Gr.395_70kHz_WBAT-CTD-SV.csv")
+       wbat.ctd$wbat_site <- "Stn.61"
+       wbat.ctd$ctd_site <- "26DA.2017.9.288_060620"
+       write.csv(wbat.ctd, "NEG2017_Stn.61_Gr.288_200kHz_WBAT-CTD-SV.csv")
        
  
 ## SV plotting ## 
@@ -274,7 +274,7 @@ ggplot(probe.all, aes(x=pressure, y=Estimate_new)) + geom_point(aes(colour=Frequ
 
 setwd("C:\\Users\\jchawars\\OneDrive - Memorial University of Newfoundland\\NEG")
 
-CTD <- read.ctd.sbe("CTD\\UpDown\\26da.2017.9.395_110618.cnv")  #read a single CTD files that coincides with WBAT profile
+CTD <- read.ctd.sbe("CTD\\UpDown\\26DA.2017.9.288_060620.cnv")  #read a single CTD files that coincides with WBAT profile
 CTD.data <- data.frame(CTD[["data"]])  #select just the data portion
 
 time <- CTD[["metadata"]]$startTime   # collect the start time of the cast
@@ -283,7 +283,7 @@ time_seconds <- period_to_seconds(lubridate::seconds(time))  # convert start tim
 CTD.data$Interval <- CTD.data$timeS + time_seconds - 5  # convert timeS to seconds by adding to start time and  add or subtract seconds to adjust the time difference between instruments
 # number of seconds from adjustments in CTD_WBAT-Time-at-depth.csv
 
-wbat.ts <- read.csv2("WBAT\\70kHz TS\\St.80_70kHz_minTS-90dB_TS_T20170908_21570201-20170908_22142300.txt", sep = ",", skip=19,header=FALSE, fill = TRUE)
+wbat.ts <- read.csv2("WBAT\\200kHz TS\\St.61_200kHz_TS_T20170904_14180756-20170904_14274200.txt", sep = ",", skip=19,header=FALSE, fill = TRUE)
 # Give new names to columns:
 nms <- c("Date","Time","Latitude","Longitude","Range","TSC","TSU","AlongshipAngle","AthwartshipAngle","sV_of_peak")
 
@@ -308,13 +308,13 @@ require(oce)
 c_new <- swSoundSpeed(salinity = sal,temperature = temp, pressure = p) # new sound speed
 
 # set constant variables from orginial calibration file -- These are all dependent on transducer type and default data colllection settings
-c <-1440.94             # original sound speed
-coeff_abs <- 0.01678    # original coefficient of absorption
-t <-1.95 *10^-4         # PulseCompressedEffectivePulseLength (sec)
-y <- -13                # two-way beam angle  --- Adjust based on transducer 
+c <-1482.41             # original sound speed
+coeff_abs <- 0.05047   # original coefficient of absorption
+t <-2.14 *10^-4         # PulseCompressedEffectivePulseLength (sec)
+y <- -20.7                # two-way beam angle  --- Adjust based on transducer 
 
-f_nominal <-70000 # nominal frequency in Hz   -- Adjust based on transducer
-f <- 70000        # center frequency         NOTE: for wideband data, these are different values
+f_nominal <-200000 # nominal frequency in Hz   -- Adjust based on transducer
+f <- 200000        # center frequency         NOTE: for wideband data, these are different values
 
 equi_beam_angle <-10^((y+20*log(f_nominal/f))/10)          # calculate equivalent beam angle
 coeff_abs_new <-swSoundAbsorption(frequency= f_nominal,    # new absorption coefficient
@@ -342,9 +342,9 @@ ggplot(wbat.ctd, aes(x=pressure, y=TSC_new)) +
   theme_bw()
 
 
-wbat.ctd$wbat_site <- "Stn.80"
+wbat.ctd$wbat_site <- "Stn.61"
 wbat.ctd$threshold <- "-90dB"
-write.csv(wbat.ctd, "NEG2017_Stn80._Gr.395_70kHZ_-90db_WBAT-CTD-TS.csv")
+write.csv(wbat.ctd, "NEG2017_Stn61._Gr.288_200kHz_WBAT-CTD-TS.csv")
 
 wbat.ctd %>% 
   mutate(bin_dist = factor(pressure%/%bin_size*50)) %>% 
@@ -353,4 +353,19 @@ wbat.ctd %>%
 
 
 
+# gather all TS data 
 
+
+files <- list.files(path="C:\\Users\\jchawars\\OneDrive - Memorial University of Newfoundland\\NEG\\Processed WBAT\\TS\\70 kHz TS", full.names = T, pattern= "*.csv")  # load files from CTD folder
+
+probe.all <- lapply(files, function(i) read.csv(i)) %>% 
+  lapply(., mutate_if, is.integer, as.character) %>% 
+  lapply(., mutate_if, is.numeric, as.character) %>% 
+  mapply(cbind, ., "SampleID"=unique(files), SIMPLIFY=F) %>% # creates a unique id from filenames
+  bind_rows() #%>%
+  mutate(., wbat_site = substr(SampleID, 107, 111)) %>% # selects the character range where stn is saved
+   select(-SampleID)
+
+write.csv(probe.all, "NEG2017_WBAT_70kHzTS.csv")
+
+paste(substr(sapply(CTD.cnv, '[[', "filename"), 51, 72)
