@@ -356,7 +356,7 @@ wbat.ctd %>%
 # gather all TS data 
 
 
-files <- list.files(path="C:\\Users\\jchawars\\OneDrive - Memorial University of Newfoundland\\NEG\\Processed WBAT\\TS\\70 kHz TS", full.names = T, pattern= "*.csv")  # load files from CTD folder
+files <- list.files(path="C:\\Users\\jchawars\\OneDrive - Memorial University of Newfoundland\\NEG\\Processed WBAT\\TS\\200 kHz TS", full.names = T, pattern= "*.csv")  # load files from CTD folder
 
 probe.all <- lapply(files, function(i) read.csv(i)) %>% 
   lapply(., mutate_if, is.integer, as.character) %>% 
@@ -366,6 +366,22 @@ probe.all <- lapply(files, function(i) read.csv(i)) %>%
   mutate(., wbat_site = substr(SampleID, 107, 111)) %>% # selects the character range where stn is saved
    select(-SampleID)
 
-write.csv(probe.all, "NEG2017_WBAT_70kHzTS.csv")
+#used to update the wbat_site column to make all files consistently named...  
+  
+  probe.all <- lapply(files, function(i) read.csv(i)) %>% 
+    lapply(., mutate_if, is.integer, as.character) %>% 
+    lapply(., mutate_if, is.numeric, as.character) %>% 
+    mapply(cbind, ., "wbat_site"=unique(wbat_site3), SIMPLIFY=F) %>% # creates a unique id from filenames
+    bind_rows() #%>%
+
+  
+wbat_site3 <- unique(probe.all$wbat_site)
+wbat_site2 <- wbat_site  
+  
+probe.all <- probe.all %>% str_replace_all(.$wbat_site, wbat_site2)
+
+
+
+write.csv(probe.all, "NEG2017_WBAT_200kHzTS.csv")
 
 paste(substr(sapply(CTD.cnv, '[[', "filename"), 51, 72)
