@@ -22,7 +22,7 @@ library(imputeTS)
 
 setwd("C:\\Users\\jchawars\\OneDrive - Memorial University of Newfoundland\\NEG")
 
-CTD <- read.ctd.sbe("CTD\\UpDown\\26DA.2017.9.24_110618.cnv")  #read a single CTD files that coincides with WBAT profile
+CTD <- read.ctd.sbe("CTD\\UpDown\\26DA.2017.9.288_060620.cnv")  #read a single CTD files that coincides with WBAT profile
 CTD.data <- data.frame(CTD[["data"]])  #select just the data portion
 
 time <- CTD[["metadata"]]$startTime   # collect the start time of the cast
@@ -31,7 +31,7 @@ time_seconds <- period_to_seconds(lubridate::seconds(time))  # convert start tim
 CTD.data$Interval <- CTD.data$timeS + time_seconds + 7 # convert timeS to seconds by adding to start time
                              # number of seconds from adjustments in CTD_WBAT-Time-at-depth.csv
 # Read in the WBAT data
-wbat <- read.csv2("WBAT\\All_Sv_70_200kHz\\St.6_70kHz_NEW_Sv_T20170825_18060263-20170825_20175985.txt", sep = ",", skip=6,header=FALSE, fill = TRUE)
+wbat <- read.csv2("WBAT\\All_Sv_70_200kHz_newest\\St.61_70kHz_Sv_T20170904_14283000-20170904_14345302.txt", sep = ",", skip=6,header=FALSE, fill = TRUE)
 #wbat <- read.csv2("St.3_70kHz_Sv.txt", sep = ",", skip=6,header=FALSE, fill = TRUE)
 
 # Give new names to columns:
@@ -47,12 +47,14 @@ wbat.meta <- wbat[1:dim(wbat)[1],1:11]      # select the metadata portion
 head(wbat.meta)
 # convert the probe time to the same format as the CTD -- NOTE: ECHOVIEW 11 has fixed their export headers...
 
+## STOP ## How many digits does the "Time" column have? Adjust Accordingly
+
 
 wbat.meta$Time <- gsub("(..)(..)(..)(..)", "\\1:\\2:\\3:\\4", wbat.meta$Time) # adjust the first (..) to (.) for single digit hours... smh
 wbat.meta$Date<- as.Date(as.character(wbat.meta$Date), "%Y%m%d")
 wbat.meta$datetime <- as.POSIXct(paste(wbat.meta$Date, wbat.meta$Time), format="%Y-%m-%d %H:%M:%S", tz="UTC")
 
-wbat.meta$Interval <- period_to_seconds(lubridate::seconds(wbat.meta$datetime)) + 114  # add or subtract seconds to adjust the time difference between instruments
+wbat.meta$Interval <- period_to_seconds(lubridate::seconds(wbat.meta$datetime))  # add or subtract seconds to adjust the time difference between instruments
 
 wbat.ctd <- wbat.meta %>% 
   left_join(., CTD.data, by="Interval") %>%     # join ctd and wbat data.frames by matching time cases
@@ -69,13 +71,23 @@ require(oce)
 c_new <- swSoundSpeed(salinity = sal,temperature = temp, pressure = p) # new sound speed
 
 # set constant variables from orginial calibration file -- These are all dependent on transducer type and default data colllection settings
-c <-1440.94             # original sound speed
-coeff_abs <- 0.01678  # original coefficient of absorption
-t <-1.95 *10^-5         # PulseCompressedEffectivePulseLength (sec)
-y <- -13                # two-way beam angle  --- Adjust based on transducer 
 
+##200khz##
+c <-1482.41     # original sound speed
+coeff_abs <- 0.05047  # original coefficient of absorption
+t <-2.14 *10^-4         # PulseCompressedEffectivePulseLength (sec)
+y <- -20.7               # two-way beam angle  --- Adjust based on transducer 
+f_nominal <-200000 # nominal frequency in Hz   -- Adjust based on transducer
+f <- 200000        # center frequency         NOTE: for wideband data, these are different values
+
+##70kHz##
+c <-1440.94     # original sound speed
+coeff_abs <- 0.01678 # original coefficient of absorption
+t <-1.94 *10^-5         # PulseCompressedEffectivePulseLength (sec)
+y <- -13               # two-way beam angle  --- Adjust based on transducer 
 f_nominal <-70000 # nominal frequency in Hz   -- Adjust based on transducer
 f <- 70000        # center frequency         NOTE: for wideband data, these are different values
+
 
 equi_beam_angle <-10^((y+20*log10(f_nominal/f))/10)          # calculate equivalent beam angle
 coeff_abs_new <-swSoundAbsorption(frequency= f_nominal,    # new absorption coefficient
@@ -144,9 +156,9 @@ d_scale <- seq(0, max(wbat.ctd$pressure), 25) # set depth scale for plotting
   # xlim(510, 490) + ylim(-90,-85) +
   theme_bw()
 
-       wbat.ctd$wbat_site <- "Stn.6"
-       wbat.ctd$ctd_site <- "26DA.2017.9.24_110618"
-       write.csv(wbat.ctd, "NEG2017_Stn.6_Gr.24_70kHz_WBAT-CTD-SV.csv")
+       wbat.ctd$wbat_site <- "Stn.61"
+       wbat.ctd$ctd_site <- "26DA.2017.9.288_110618"
+       write.csv(wbat.ctd, "NEG2017_Stn.61_Gr.288_70kHz_WBAT-CTD-SV.csv")
        
  
 ## SV plotting ## 
@@ -256,9 +268,9 @@ write.csv(probe.all, "NEG2017_WBAT_AllSv.csv")
 
 Sv_label <- expression(paste("Mean S"["v"]," [dB re 1 m" ^-1,"]"))
 
-ggplot(probe.all, aes(x=pressure, y=Estimate_new)) + geom_point(aes(colour=Frequency)) +
-  stat_smooth(formula = y ~ s(x, k = 45), method = "gam", se = T, linetype="dashed", color="black", aes(colour=Frequency)) + 
-  coord_flip()+ scale_x_reverse() + labs(x= "Pressure [dBar]", y=Sv_label) +
+ggplot(probe.all, aes(x=as.numeric(pressure), y=as.numeric(Estimate_new))) + geom_line(aes(colour=Frequency)) +
+  #stat_smooth(formula = y ~ s(x, k = 45), method = "gam", se = T, linetype="dashed", color="black", aes(colour=Frequency)) + 
+  coord_flip()+ scale_x_reverse() + xlim(250, 0) + labs(x= "Pressure [dBar]", y=Sv_label) + facet_wrap(~wbat_site) +
   theme_bw()
 
 
